@@ -1,46 +1,33 @@
+# Agent Coherence Framework (ACF)
+
+**A reliability layer for autonomous LLM agents.**
+
+ACF is a Python framework designed to solve the "Hallucination Loop" problem in autonomous agents. It introduces a **metabolic regulation layer** that forces agents to "suspend judgment" rather than fabricate data when confidence is low.
+
+## The Problem
+Standard agent architectures optimize for **Throughput** (answering quickly). This leads to:
+1.  **Hallucination Cascades:** One wrong answer becomes context for the next, degrading the entire thread.
+2.  **Resource Burn:** Agents spinning in loops trying to solve impossible tasks.
+3.  **Context Pollution:** Low-quality data crowding out high-quality instructions.
+
+## The Solution
+ACF enforces **Dynamic Coherence Constraints**:
+* **Confidence Gating:** Agents cannot output data below a calculated verification threshold.
+* **State Preservation:** High-fidelity memory is prioritized over new generation.
+* **Error Recovery:** "Mistakes" are isolated and dissolved rather than compounded.
+
+## Usage
+This framework is designed to wrap around your existing LangChain, AutoGPT, or custom agent loop.
 
 ```python
-import time
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
-from enum import Enum
+from acf import CoherenceManager
 
-class SystemState(Enum):
-    """Operational states of the agent."""
-    STABLE = "stable"              # Fully coherent
-    SUSPENDED = "suspended"        # Paused to verify
-    DEGRADED = "degraded"          # Low confidence, requires external input
-    RECOVERY = "recovery"          # Rolling back to last known good state
+# Initialize the manager
+manager = CoherenceManager(threshold=0.85)
 
-@dataclass
-class InteractionEvent:
-    """A single unit of interaction (formerly 'Signal')."""
-    source_id: str
-    content: str
-    confidence_score: float
-    timestamp: float
-
-class CoherenceManager:
-    """
-    Main controller for Agent Reliability.
-    Prevents hallucination by enforcing confidence thresholds.
-    """
-    
-    def __init__(self, confidence_threshold: float = 0.85):
-        self.threshold = confidence_threshold
-        self.state = SystemState.STABLE
-        self.interaction_history: List[InteractionEvent] = []
-        self.trust_scores: Dict[str, float] = {}
-
-    def assess_input(self, input_data: str, source_id: str) -> bool:
-        """
-        Filters incoming data (formerly 'Selective Permeability').
-        Rejects input that increases system entropy too fast.
-        """
-        current_trust = self.trust_scores.get(source_id, 0.5)
-        
-        # Simple heuristic: If trust is low, we need higher verification
-        if current_trust < 0.4 and len(input_data) > 1000:
+# Before generating response
+if manager.check_stability(context) < 0.8:
+    return manager.execute_suspension("Insufficient context for reliable generation.")
             return False # Reject 'spam' or noise from untrusted sources
         return True
 
